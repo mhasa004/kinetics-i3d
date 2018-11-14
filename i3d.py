@@ -456,6 +456,15 @@ class InceptionI3d(snt.AbstractModule):
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
 
+    end_point = 'Last_pool'
+    with tf.variable_scope(end_point):
+      last_pool = tf.nn.avg_pool3d(net, ksize=[1, 2, 7, 7, 1],
+                             strides=[1, 1, 1, 1, 1], padding=snt.VALID)
+      last_pool = tf.nn.dropout(last_pool, dropout_keep_prob)
+      last_pool = tf.reduce_mean(last_pool, axis=1)
+      last_pool = tf.squeeze(last_pool)
+    end_points[end_point] = last_pool
+
     end_point = 'Logits'
     with tf.variable_scope(end_point):
       net = tf.nn.avg_pool3d(net, ksize=[1, 2, 7, 7, 1],
