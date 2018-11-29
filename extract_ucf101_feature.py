@@ -1,12 +1,16 @@
 import os
 from tqdm import tqdm
-import imageio
 import numpy as np
 import tensorflow as tf
 import i3d
 import tensorflow_hub as hub
 import random
 import pickle
+import imageio
+imageio.plugins.ffmpeg.download()
+
+import warnings
+warnings.filterwarnings("ignore")
 
 
 class KineticsFeature(object):
@@ -62,15 +66,13 @@ class KineticsFeature(object):
 
     def extract_feature_local(self, video):
         video = np.expand_dims(video, axis=0)
-        video_segs = np.zeros(shape=(50, 16, 224, 224, 3))
+        video_segs = np.zeros(shape=(500, 16, 224, 224, 3))
         idx = 0
-        for i in range(0, video.shape[1]-16, 8):
+        for i in range(0, video.shape[1]-16, 16):
             video_segs[idx] = video[0, i:i+16, :, :]
             idx += 1
         video_segs = video_segs[:idx]
-
         out_preds, out_logits = self.sess.run([self.preds, self.end_points['Last_pool']], {self.model_input: video_segs})
-        
         return out_preds, out_logits
 
 
@@ -81,9 +83,12 @@ class KineticsFeature(object):
                 print('File does not exist:', video_path)
                 exit(0)
 
-            video_np = self.read_avideo(video_path)
-            video_np = self.center_crop(video_np)
-            self.features[video.split()[0]] = self.extract_feature_local(video_np)
+            try:
+                video_np = self.read_avideo(video_path)
+                video_np = self.center_crop(video_np)
+                self.features[video.split()[0]] = self.extract_feature_local(video_np)
+            except:
+                pass
 
         with open(os.path.join(self.data_dir, 'kinetics_feature.pk'), 'wb') as fid:
             pickle.dump(self.features, fid, protocol=pickle.HIGHEST_PROTOCOL)
