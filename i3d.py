@@ -464,6 +464,7 @@ class InceptionI3d(snt.AbstractModule):
       final_feature = tf.nn.dropout(final_feature, dropout_keep_prob)
       final_feature = tf.reduce_mean(final_feature, axis=1)
       final_feature = tf.squeeze(final_feature)
+      final_feature = tf.expand_dims(final_feature, 0)
     end_points[end_point] = final_feature
 
     end_point = 'Logits'

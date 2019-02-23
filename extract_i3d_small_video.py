@@ -87,7 +87,7 @@ class KineticsFeature(object):
     def load_i3d_model(self):
 
         if self.args.type in ['rgb', 'joint']:
-            self.model_input_rgb = tf.placeholder(tf.float32, shape=(None, self.args.tw, self.imgsize, self.imgsize, 3))
+            self.model_input_rgb = tf.placeholder(tf.float32, shape=(None, None, self.imgsize, self.imgsize, 3))
             with tf.variable_scope('RGB'):
                 rgb_model = i3d.InceptionI3d(self.num_classes, spatial_squeeze=True, final_endpoint='Logits')
                 logits_rgb, feature_rgb, _ = rgb_model(self.model_input_rgb, is_training=False, dropout_keep_prob=1.0)
@@ -101,7 +101,7 @@ class KineticsFeature(object):
             print('RGB checkpoint restored')
 
         if self.args.type in ['flow', 'joint']:
-            self.model_input_flow = tf.placeholder(tf.float32, shape=(None, self.args.tw, self.imgsize, self.imgsize, 2))
+            self.model_input_flow = tf.placeholder(tf.float32, shape=(None, None, self.imgsize, self.imgsize, 2))
             with tf.variable_scope('Flow'):
                 flow_model = i3d.InceptionI3d(self.num_classes, spatial_squeeze=True, final_endpoint='Logits')
                 logits_flow, feature_flow, _ = flow_model(self.model_input_flow, is_training=False, dropout_keep_prob=1.0)
@@ -129,14 +129,19 @@ class KineticsFeature(object):
 
     def extract_feature_joint(self, frames, flows):
         num_frames = frames.shape[0]
-        num_segs = (num_frames - self.args.tw) // self.args.stride + 1
-        video_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 3))
-        flow_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 2))
-        idx = 0
-        for i in range(0, num_frames-self.args.tw, self.args.stride):
-            video_segs[idx] = frames[i:i+self.args.tw, :, :, :]
-            flow_segs[idx] = flows[i:i+self.args.tw, :, :, :]
-            idx += 1
+        if self.args.tw == -1:
+            video_segs = np.expand_dims(frames, axis=0)
+            flow_segs = np.expand_dims(flows, axis=0)
+        else:
+            num_segs = (num_frames - self.args.tw) // self.args.stride + 1
+            video_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 3))
+            flow_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 2))
+            idx = 0
+            for i in range(0, num_frames-self.args.tw, self.args.stride):
+                video_segs[idx] = frames[i:i+self.args.tw, :, :, :]
+                flow_segs[idx] = flows[i:i+self.args.tw, :, :, :]
+                idx += 1
+        
         feed_dict = {self.model_input_rgb: video_segs, self.model_input_flow: flow_segs}
         model_out = self.sess.run([self.model_feature, self.model_logits, self.model_prediction], feed_dict)
 
@@ -145,12 +150,17 @@ class KineticsFeature(object):
 
     def extract_feature_rgb(self, frames):
         num_frames = frames.shape[0]
-        num_segs = (num_frames - self.args.tw) // self.args.stride + 1
-        video_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 3))
-        idx = 0
-        for i in range(0, num_frames-self.args.tw, self.args.stride):
-            video_segs[idx] = frames[i:i+self.args.tw, :, :, :]
-            idx += 1
+        if self.args.tw == -1:
+            video_segs = np.expand_dims(frames, axis=0)
+        else:
+            num_segs = (num_frames - self.args.tw) // self.args.stride + 1
+            video_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 3))
+            idx = 0
+            for i in range(0, num_frames-self.args.tw, self.args.stride):
+                video_segs[idx] = frames[i:i+self.args.tw, :, :, :]
+                idx += 1
+            print(video_segs.shape)
+        
         feed_dict = {self.model_input_rgb: video_segs}
         model_out = self.sess.run([self.model_feature, self.model_logits, self.model_prediction], feed_dict)
 
@@ -159,12 +169,16 @@ class KineticsFeature(object):
 
     def extract_feature_flow(self, flows):
         num_frames = flows.shape[0]
-        num_segs = (num_frames - self.args.tw) // self.args.stride + 1
-        flow_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 2))
-        idx = 0
-        for i in range(0, num_frames-self.args.tw, self.args.stride):
-            flow_segs[idx] = flows[i:i+self.args.tw, :, :, :]
-            idx += 1
+        if self.args.tw == -1:
+            flow_segs = np.expand_dims(flows, axis=0)
+        else:
+            num_segs = (num_frames - self.args.tw) // self.args.stride + 1
+            flow_segs = np.zeros(shape=(num_segs, self.args.tw, self.imgsize, self.imgsize, 2))
+            idx = 0
+            for i in range(0, num_frames-self.args.tw, self.args.stride):
+                flow_segs[idx] = flows[i:i+self.args.tw, :, :, :]
+                idx += 1
+        
         feed_dict = {self.model_input_flow: flow_segs}
         model_out = self.sess.run([self.model_feature, self.model_logits, self.model_prediction], feed_dict)
 
